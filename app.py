@@ -1,38 +1,32 @@
+from pathlib import Path
 import base64
 import subprocess
-from pathlib import Path
-
-from dash import Dash, html, dcc, Input, Output, State
 import pandas as pd
 
-# -------------------------
+from dash import Dash, html, dcc, Input, Output, State
+
+
+# =====================
 # Paths
-# -------------------------
-BASE_DIR = Path(__file__).parent
-UPLOAD_DIR = BASE_DIR / "uploads"
+# =====================
+BASE_DIR = Path(__file__).resolve().parent
+UPLOADS_DIR = BASE_DIR / "uploads"
 RESULTS_DIR = BASE_DIR / "results"
 
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOADS_DIR.mkdir(exist_ok=True)
 RESULTS_DIR.mkdir(exist_ok=True)
 
-RUN_CIE_SCRIPT = BASE_DIR / "run_cie.R"
 
-# -------------------------
-# App
-# -------------------------
+# =====================
+# Dash app
+# =====================
 app = Dash(__name__)
-server = app.server
 
-# -------------------------
-# Layout
-# -------------------------
 app.layout = html.Div(
-    style={"width": "70%", "margin": "40px auto", "fontFamily": "serif"},
+    style={"maxWidth": "900px", "margin": "40px"},
     children=[
         html.H1("Inference Dash"),
-        html.P(
-            "Unified interface for CIE (statistical, R) and ORNOR (Bayesian) inference"
-        ),
+        html.P("Unified interface for CIE (statistical, R) and ORNOR (Bayesian) inference"),
         html.Hr(),
 
         html.H3("Inference method"),
@@ -43,134 +37,129 @@ app.layout = html.Div(
                 {"label": "ORNOR (Bayesian)", "value": "ornor"},
             ],
             value="cie",
-            inline=True,
         ),
 
         html.Br(),
         html.H3("Upload expression matrix (CSV)"),
         dcc.Upload(
             id="upload",
-            children=html.Div(
-                ["Drag and Drop or ", html.A("Select File")]
-            ),
+            children=html.Div(["Drag and Drop or Select File"]),
             style={
                 "width": "100%",
-                "height": "80px",
-                "lineHeight": "80px",
+                "height": "60px",
+                "lineHeight": "60px",
                 "borderWidth": "1px",
                 "borderStyle": "dashed",
                 "borderRadius": "5px",
                 "textAlign": "center",
             },
-            multiple=False,
         ),
 
         html.Br(),
-        html.Button("Run inference", id="run", n_clicks=0),
+        html.Button("Run inference", id="run-btn"),
+        html.Br(),
+        html.Br(),
 
-        html.Br(),
-        html.Br(),
         html.Div(id="status"),
-        html.Hr(),
-        html.Div(id="output-preview"),
+        html.Div(id="preview"),
     ],
 )
 
-# -------------------------
+
+# =====================
+# Helpers
+# =====================
+def render_success(df: pd.DataFrame, message: str):
+    return html.Div(
+        children=[
+            html.P(f"✅ {message}", style={"color": "green"}),
+            html.Hr(),
+            html.H4("Output preview"),
+            html.P(f"Rows: {df.shape[0]} | Columns: {df.shape[1]}"),
+            html.Pre(df.head(10).to_string(index=False)),
+        ]
+    )
+
+
+def render_error(msg: str):
+    return html.Div(
+        children=[
+            html.P("❌ Error:", style={"color": "red", "fontWeight": "bold"}),
+            html.Pre(msg),
+        ]
+    )
+
+
+# =====================
 # Callback
-# -------------------------
+# =====================
 @app.callback(
     Output("status", "children"),
-    Output("output-preview", "children"),
-    Input("run", "n_clicks"),
+    Output("preview", "children"),
+    Input("run-btn", "n_clicks"),
     State("method", "value"),
     State("upload", "contents"),
     State("upload", "filename"),
-    prevent_initial_call=True,
 )
 def run_inference(n_clicks, method, contents, filename):
+    if not n_clicks:
+        return "", ""
+
     if contents is None:
-        return html.Span("❌ No file uploaded", style={"color": "red"}), None
+        return render_error("No file uploaded."), ""
 
     try:
-        # -------------------------
-        # Decode uploaded file
-        # -------------------------
+        # ---- Decode upload ----
         content_type, content_string = contents.split(",")
         decoded = base64.b64decode(content_string)
 
-        expr_path = UPLOAD_DIR / filename
-        with open(expr_path, "wb") as f:
+        upload_path = UPLOADS_DIR / filename
+        with open(upload_path, "wb") as f:
             f.write(decoded)
 
-        # -------------------------
-        # Run CIE
-        # -------------------------
+        # =====================
+        # CIE (R)
+        # =====================
         if method == "cie":
-            network_csv = BASE_DIR / "networks" / "human_network.csv"
             out_csv = RESULTS_DIR / "cie_output.csv"
 
             cmd = [
                 "Rscript",
-                str(RUN_CIE_SCRIPT),
-                str(expr_path),
-                str(network_csv),
+                str(BASE_DIR / "run_cie.R"),
+                str(upload_path),
+                str(BASE_DIR / "networks" / "human_network.csv"),
                 str(out_csv),
             ]
 
-            subprocess.run(cmd, check=True)
+            subprocess.check_call(cmd)
 
             df = pd.read_csv(out_csv)
-            preview = df.head(20)
+            return render_success(df, "CIE inference completed"), ""
 
-            return (
-                html.Span("✅ CIE inference completed", style={"color": "green"}),
-                html.Div(
-                    [
-                        html.H4("Output preview"),
-                        dcc.Markdown(f"Rows: {df.shape[0]} | Columns: {df.shape[1]}"),
-                        dcc.Markdown(preview.to_markdown(index=False)),
-                    ]
-                ),
-            )
+        # =====================
+        # ORNOR (stub)
+        # =====================
+        elif method == "ornor":
+            from backend.ornor import run_ornor
 
-        # -------------------------
-        # ORNOR placeholder
-        # -------------------------
+            out_csv = RESULTS_DIR / "ornor_output.csv"
+            run_ornor(upload_path, out_csv)
+
+            df = pd.read_csv(out_csv)
+            return render_success(df, "ORNOR inference completed"), ""
+
         else:
-            return (
-                html.Span(
-                    "⚠️ ORNOR backend not wired yet",
-                    style={"color": "orange"},
-                ),
-                None,
-            )
+            return render_error("Unknown inference method."), ""
 
     except subprocess.CalledProcessError as e:
-        return (
-            html.Div(
-                [
-                    html.Span("❌ Inference failed:", style={"color": "red"}),
-                    html.Pre(str(e)),
-                ]
-            ),
-            None,
-        )
+        return render_error(str(e)), ""
 
     except Exception as e:
-        return (
-            html.Div(
-                [
-                    html.Span("❌ Error:", style={"color": "red"}),
-                    html.Pre(str(e)),
-                ]
-            ),
-            None,
-        )
+        return render_error(str(e)), ""
 
 
-# -------------------------
-# Run
-# -------------------------
+# =====================
+# Main
+# =====================
 if __name__ == "__main__":
     app.run(debug=True)

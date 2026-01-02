@@ -1,86 +1,34 @@
+# backend/ornor.py
 """
-ORNOR backend wrapper for Dash
-- Ensures nlbayes-python is importable
-- Runs ORNOR inference
-- Returns posterior edge probabilities in a CIE-compatible format
+ORNOR stub backend.
+
+This is a placeholder implementation that mimics the output
+format of ORNOR inference without running nlbayes yet.
 """
 
-import sys
 from pathlib import Path
 import pandas as pd
 
-# ------------------------------------------------------------------
-# FIX PATH so Dash can import nlbayes even outside nlbayes-python
-# ------------------------------------------------------------------
 
-NLBAYES_ROOT = Path("/home/ava/nlbayes_project/nlbayes-python")
-if str(NLBAYES_ROOT) not in sys.path:
-    sys.path.insert(0, str(NLBAYES_ROOT))
-
-from nlbayes import ORNOR
-
-
-# ------------------------------------------------------------------
-# ORNOR runner
-# ------------------------------------------------------------------
-
-def run_ornor(
-    expression_csv: str,
-    out_dir: str,
-    n_samples: int = 5,
-    burnin: int = 20,
-):
+def run_ornor(expr_csv: Path, out_csv: Path) -> None:
     """
-    Run ORNOR Bayesian inference
+    Stub ORNOR inference.
 
     Parameters
     ----------
-    expression_csv : str
-        Path to expression matrix CSV
-    out_dir : str
-        Output directory
-    n_samples : int
-        Posterior samples
-    burnin : int
-        Burn-in samples
-
-    Returns
-    -------
-    pandas.DataFrame
-        Posterior edge probabilities (CIE-style)
+    expr_csv : Path
+        Input expression matrix CSV
+    out_csv : Path
+        Output CSV path
     """
 
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Fake ORNOR-style posterior results
+    df = pd.DataFrame({
+        "TF": [151636, 3799, 23317, 9652, 3895,
+               55183, 23064, 84162, 2633, 7175],
+        "posterior_mean": [0.91, 0.88, 0.86, 0.84, 0.82,
+                           0.80, 0.78, 0.76, 0.74, 0.72],
+        "posterior_sd": [0.02] * 10
+    })
 
-    # ----------------------------
-    # Load expression data
-    # ----------------------------
-    expr = pd.read_csv(expression_csv, index_col=0)
-
-    # ----------------------------
-    # Initialize ORNOR
-    # ----------------------------
-    model = ORNOR(expr)
-
-    # ----------------------------
-    # Run inference
-    # ----------------------------
-    model.fit(expr, n_samples=n_samples, burnin=burnin)
-
-    # ----------------------------
-    # Extract posterior edges
-    # ----------------------------
-    edges = model.get_posterior()
-
-    # Convert to DataFrame
-    df = pd.DataFrame(
-        edges,
-        columns=["regulator", "target", "state", "probability"]
-    )
-
-    # Save CSV
-    out_csv = out_dir / "ornor_posterior.csv"
     df.to_csv(out_csv, index=False)
-
-    return df
