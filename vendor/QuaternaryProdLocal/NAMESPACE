@@ -1,0 +1,3 @@
+useDynLib(QuaternaryProdLocal, .registration=TRUE)
+importFrom(Rcpp, evalCpp)
+export(BioQCREtoNet)
