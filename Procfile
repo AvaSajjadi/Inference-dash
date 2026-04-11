@@ -1,1 +1,1 @@
-web: python app2.py
+web: bash start.sh
