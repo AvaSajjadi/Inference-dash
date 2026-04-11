@@ -51,6 +51,7 @@ import re
 import os
 import sys
 import subprocess
+import shutil
 import threading
 import time
 import traceback
@@ -1398,8 +1399,10 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
+            # Find Rscript in PATH, or use fallback paths for container environments
+            rscript_path = shutil.which("Rscript") or "/usr/bin/Rscript" or "/root/.nix-profile/bin/Rscript"
             cmd = [
-                "Rscript", str(CIE_RUNNER),
+                rscript_path, str(CIE_RUNNER),
                 "-s", str(in_path),
                 "-o", str(out_edges),
                 "--rels", str(rels_path),
