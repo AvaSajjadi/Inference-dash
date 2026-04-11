@@ -1,6 +1,5 @@
 # Nixpacks configuration for Railway
 # Include R runtime and build dependencies
-# Package installation handled via Procfile release phase
 
 [build]
 nixpkgs_archive = "nixpkgs=https://github.com/NixOS/nixpkgs/archive/23.11.tar.gz"
@@ -22,3 +21,6 @@ value = "git"
 
 [[build.nix_pkgs]]
 value = "libxml2"
+
+[build.commands]
+build = "bash build.sh"
