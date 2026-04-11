@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway
+# Include R runtime and required build tools
+
+[build]
+nixpkgs_archive = "nixpkgs=https://github.com/NixOS/nixpkgs/archive/23.11.tar.gz"
+
+[[build.nix_pkgs]]
+value = "R"
+
+[[build.nix_pkgs]]
+value = "gcc"
+
+[[build.nix_pkgs]]
+value = "glibc"
