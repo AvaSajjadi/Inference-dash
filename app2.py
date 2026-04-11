@@ -3528,4 +3528,6 @@ if __name__ == "__main__":
             _warmed.add(str(_ents))
     print(f"[STARTUP] Entities cache ready ({len(_warmed)} file(s) loaded).", flush=True)
 
-    app.run(host="0.0.0.0", port=8050, debug=False, threaded=True)
+    # Use PORT env var if available (Railway, Heroku), otherwise default to 8050
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
