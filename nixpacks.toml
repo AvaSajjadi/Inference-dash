@@ -31,3 +31,6 @@ value = "R"
 
 [[runtime.nix_pkgs]]
 value = "glibc"
+
+[runtime.env]
+PATH = "/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
