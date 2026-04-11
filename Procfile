@@ -1,2 +1,2 @@
-release: apt-get update && apt-get install -y r-base
+release: Rscript install.R
 web: python app2.py
