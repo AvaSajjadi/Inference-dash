@@ -1,1 +1,2 @@
-web: python3 app2.py
+release: Rscript install.R
+web: gunicorn --bind 0.0.0.0:$PORT app2:app
