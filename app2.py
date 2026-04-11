@@ -1399,22 +1399,14 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
-            # Find Rscript: check env variable first (set by start.sh), then PATH, then fallback locations
-            import os
-            rscript_path = os.environ.get("RSCRIPT_PATH")
-            if not rscript_path:
+            # Find Rscript using helper module
+            try:
+                from find_r import find_rscript
+                rscript_path = find_rscript()
+            except:
+                # Fallback if import fails
                 rscript_path = shutil.which("Rscript")
-            if not rscript_path:
-                # Check if path was saved during build
-                saved_path_file = Path("/app/.rscript_path")
-                if saved_path_file.exists():
-                    rscript_path = saved_path_file.read_text().strip()
-            if not rscript_path:
-                # Fallback paths for Nixpacks and other container environments
-                for path in ["/root/.nix-profile/bin/Rscript", "/usr/bin/Rscript", "/nix/var/nix/profiles/default/bin/Rscript"]:
-                    if Path(path).exists():
-                        rscript_path = path
-                        break
+
             if not rscript_path:
                 write_status(job, state="error", message="R (Rscript) not found in PATH or standard locations")
                 return
