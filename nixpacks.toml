@@ -12,3 +12,12 @@ value = "gcc"
 
 [[build.nix_pkgs]]
 value = "glibc"
+
+[[build.nix_pkgs]]
+value = "curl"
+
+[[build.nix_pkgs]]
+value = "git"
+
+[build.commands]
+build = "Rscript install.R"

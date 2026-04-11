@@ -1,6 +1,10 @@
-# Heroku R buildpack requires this file
-# Install any R packages needed for CIE
+# Install R packages needed for CIE analysis
+# This runs during Railway/Heroku build
 
-# Base packages needed for statistics/data processing
-if (!require("tidyverse")) install.packages("tidyverse")
-if (!require("data.table")) install.packages("data.table")
+install.packages("dplyr", repos="https://cloud.r-project.org")
+install.packages("magrittr", repos="https://cloud.r-project.org")
+install.packages("data.table", repos="https://cloud.r-project.org")
+
+# CIE package from GitHub
+if (!require("remotes")) install.packages("remotes", repos="https://cloud.r-project.org")
+remotes::install_github("cansylab/CIE", upgrade="never")
