@@ -1399,8 +1399,11 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
-            # Find Rscript in PATH, or check saved path from build, or check common container paths
-            rscript_path = shutil.which("Rscript")
+            # Find Rscript: check env variable first (set by start.sh), then PATH, then fallback locations
+            import os
+            rscript_path = os.environ.get("RSCRIPT_PATH")
+            if not rscript_path:
+                rscript_path = shutil.which("Rscript")
             if not rscript_path:
                 # Check if path was saved during build
                 saved_path_file = Path("/app/.rscript_path")

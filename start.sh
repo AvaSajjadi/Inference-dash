@@ -8,20 +8,24 @@ fi
 
 # Add common Nix paths to PATH
 export PATH="/nix/var/nix/profiles/default/bin:$PATH"
-export PATH="/nix/store/*/bin:$PATH"
 
-# Verify R is available
-if ! command -v Rscript &> /dev/null; then
-    echo "WARNING: Rscript still not in PATH, searching for it..."
+# Find Rscript and export its full path
+RSCRIPT=$(which Rscript)
+if [ -z "$RSCRIPT" ]; then
     RSCRIPT=$(find /nix -name Rscript -type f 2>/dev/null | head -1)
-    if [ -n "$RSCRIPT" ]; then
-        echo "Found Rscript at: $RSCRIPT"
-        export PATH="$(dirname $RSCRIPT):$PATH"
-    fi
 fi
 
-echo "PATH=$PATH"
-echo "Rscript location: $(which Rscript)"
+if [ -n "$RSCRIPT" ]; then
+    echo "Found Rscript at: $RSCRIPT"
+    export RSCRIPT_PATH="$RSCRIPT"
+    export PATH="$(dirname $RSCRIPT):$PATH"
+else
+    echo "ERROR: Rscript not found anywhere"
+    exit 1
+fi
 
-# Start the app
+echo "Exported RSCRIPT_PATH=$RSCRIPT_PATH"
+echo "PATH=$PATH"
+
+# Start the app with Rscript path in environment
 python app2.py
