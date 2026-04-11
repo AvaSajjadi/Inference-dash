@@ -1399,16 +1399,17 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
-            # Find Rscript using helper module
-            try:
-                from find_r import find_rscript
-                rscript_path = find_rscript()
-            except:
-                # Fallback if import fails
-                rscript_path = shutil.which("Rscript")
-
+            # Find Rscript - should be in PATH in Docker
+            rscript_path = shutil.which("Rscript")
             if not rscript_path:
-                write_status(job, state="error", message="R (Rscript) not found in PATH or standard locations")
+                # Try helper module as fallback
+                try:
+                    from find_r import find_rscript
+                    rscript_path = find_rscript()
+                except:
+                    pass
+            if not rscript_path:
+                write_status(job, state="error", message="R (Rscript) not found in PATH - is R installed?")
                 return
             cmd = [
                 rscript_path, str(CIE_RUNNER),
