@@ -1399,8 +1399,17 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
-            # Find Rscript in PATH, or use fallback paths for container environments
-            rscript_path = shutil.which("Rscript") or "/usr/bin/Rscript" or "/root/.nix-profile/bin/Rscript"
+            # Find Rscript in PATH, or check common container paths
+            rscript_path = shutil.which("Rscript")
+            if not rscript_path:
+                # Fallback paths for Nixpacks and other container environments
+                for path in ["/root/.nix-profile/bin/Rscript", "/usr/bin/Rscript", "/nix/var/nix/profiles/default/bin/Rscript"]:
+                    if Path(path).exists():
+                        rscript_path = path
+                        break
+            if not rscript_path:
+                write_status(job, state="error", message="R (Rscript) not found in PATH or standard locations")
+                return
             cmd = [
                 rscript_path, str(CIE_RUNNER),
                 "-s", str(in_path),
