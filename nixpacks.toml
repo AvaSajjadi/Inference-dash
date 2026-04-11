@@ -1,0 +1,35 @@
+# Nixpacks configuration for Railway
+# Configure both build and runtime to include R
+
+[build]
+nixpkgs_archive = "nixpkgs=https://github.com/NixOS/nixpkgs/archive/23.11.tar.gz"
+
+# Build packages
+[[build.nix_pkgs]]
+value = "R"
+
+[[build.nix_pkgs]]
+value = "python310"
+
+[[build.nix_pkgs]]
+value = "gcc"
+
+[[build.nix_pkgs]]
+value = "curl"
+
+[[build.nix_pkgs]]
+value = "git"
+
+# Build commands - install R packages
+[build.commands]
+build = "which Rscript && Rscript install.R"
+
+# Runtime packages - CRITICAL: R must be in runtime
+[[runtime.nix_pkgs]]
+value = "R"
+
+[[runtime.nix_pkgs]]
+value = "curl"
+
+[runtime.env]
+PATH = "/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin:$PATH"
