@@ -1399,8 +1399,13 @@ def job_thread(
 
         if engine == "CIE":
             out_edges = job.out_dir / "cie_edges.csv"
-            # Find Rscript in PATH, or check common container paths
+            # Find Rscript in PATH, or check saved path from build, or check common container paths
             rscript_path = shutil.which("Rscript")
+            if not rscript_path:
+                # Check if path was saved during build
+                saved_path_file = Path("/app/.rscript_path")
+                if saved_path_file.exists():
+                    rscript_path = saved_path_file.read_text().strip()
             if not rscript_path:
                 # Fallback paths for Nixpacks and other container environments
                 for path in ["/root/.nix-profile/bin/Rscript", "/usr/bin/Rscript", "/nix/var/nix/profiles/default/bin/Rscript"]:

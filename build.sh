@@ -12,9 +12,9 @@ fi
 
 echo "Found Rscript at: $RSCRIPT_PATH"
 
-# Create symlink in /usr/local/bin for easy access
-mkdir -p /usr/local/bin
-ln -sf "$RSCRIPT_PATH" /usr/local/bin/Rscript || true
+# Save Rscript path for runtime access
+echo "$RSCRIPT_PATH" > /app/.rscript_path
+chmod 644 /app/.rscript_path
 
 # Install R packages for CIE analysis
 echo "Installing R packages..."
@@ -28,4 +28,4 @@ remotes::install_github("cansylab/CIE", upgrade="never")
 EOF
 
 echo "R packages installed successfully"
-echo "Rscript location: $RSCRIPT_PATH"
+echo "Rscript path saved to: /app/.rscript_path"
