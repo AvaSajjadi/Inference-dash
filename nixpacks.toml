@@ -1,5 +1,5 @@
 # Nixpacks configuration for Railway
-# Include R runtime and build dependencies
+# Include R in both build and runtime environments
 
 [build]
 nixpkgs_archive = "nixpkgs=https://github.com/NixOS/nixpkgs/archive/23.11.tar.gz"
@@ -24,3 +24,10 @@ value = "libxml2"
 
 [build.commands]
 build = "bash build.sh"
+
+# Runtime packages - ensure R is available when app runs
+[[runtime.nix_pkgs]]
+value = "R"
+
+[[runtime.nix_pkgs]]
+value = "glibc"
