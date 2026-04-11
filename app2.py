@@ -116,12 +116,30 @@ DEFAULT_NETWORKS: Dict[str, Dict[str, str]] = {
             NETWORKS_DIR / "all_tissues.entities",
         ),
     },
+
+    "ORNOR Entrez (three_tissues.entrez.rels)": {
+        "rels": first_existing(
+            NETWORKS_DIR / "three_tissues.entrez.rels",
+        ),
+        "entities": None,
+    },
+
+    "ORNOR Entrez (all_tissues_entrez.rels)": {
+        "rels": first_existing(
+            NETWORKS_DIR / "all_tissues_entrez.rels",
+        ),
+        "entities": None,
+    },
 }
 
 
 def preferred_network_choice_for_engine(engine: Optional[str]) -> str:
-    # Both CIE and ORNOR default to three_tissue.rels (professor's setup)
-    return "tcChIP (three_tissue.rels) [default]"
+    if engine == "ORNOR":
+        # ORNOR defaults to all_tissues Entrez network (better coverage)
+        return "ORNOR Entrez (all_tissues_entrez.rels)"
+    else:
+        # CIE defaults to professor's setup: three_tissue.rels + ChIPfilter
+        return "tcChIP (three_tissue.rels) [default]"
 
 
 # =============================================================================
@@ -409,20 +427,23 @@ def zip_outputs(out_dir: Path, zip_path: Path, exclude_paths: Optional[Set[Path]
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         if out_dir.exists():
-            for fp in out_dir.rglob("*"):
-                if not fp.is_file():
-                    continue
+            # Only include TF results files (*_tfs.tsv or *_tfs.csv)
+            # This gives users just the summary results table, not all intermediate files
+            for fp in out_dir.glob("*_tfs.tsv"):
                 try:
                     resolved = fp.resolve()
                 except Exception:
                     resolved = fp
+                if resolved != zip_self and resolved not in exclude_resolved:
+                    z.write(fp, arcname=fp.name)
 
-                if resolved == zip_self:
-                    continue
-                if resolved in exclude_resolved:
-                    continue
-
-                z.write(fp, arcname=str(fp.relative_to(out_dir)))
+            for fp in out_dir.glob("*_tfs.csv"):
+                try:
+                    resolved = fp.resolve()
+                except Exception:
+                    resolved = fp
+                if resolved != zip_self and resolved not in exclude_resolved:
+                    z.write(fp, arcname=fp.name)
 
 
 # =============================================================================
@@ -1430,7 +1451,7 @@ def job_thread(
                 write_status(job, state="error", message=f"ORNOR failed (rc={rc}). {last}")
                 return
 
-        zip_outputs(job.job_dir, job.zip_path, exclude_paths={job.zip_path})
+        zip_outputs(job.job_dir / "out", job.zip_path, exclude_paths={job.zip_path})
         write_status(job, state="done", progress=100, message="Finished.", zip_path=str(job.zip_path))
     except Exception as e:
         tb = traceback.format_exc()
@@ -1519,6 +1540,7 @@ def prepare_tf_display_df(
     engine: str,
     top_n: int,
     min_display_score: float,
+    use_pval_filter: bool = True,
 ) -> Tuple[pd.DataFrame, str]:
     if tf_df is None or tf_df.empty:
         return pd.DataFrame(), "score"
@@ -1570,7 +1592,9 @@ def prepare_tf_display_df(
         )
 
     df = df.dropna(subset=["display_score"]).copy()
-    df = df[df["display_score"] >= float(min_display_score)].copy()
+    # Only filter by p-value if enabled
+    if use_pval_filter:
+        df = df[df["display_score"] >= float(min_display_score)].copy()
     df = df.sort_values("display_score", ascending=False).copy()
 
     if top_n > 0:
@@ -2473,12 +2497,16 @@ app.layout = html.Div(
                     dcc.Input(id="top_n_regulators_in", type="number", value=20, min=1, step=1, style=INPUT_STYLE),
 
                     html.Div(style={"height": "10px"}),
-                    html.Div("Minimum regulator score", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
+                    html.Div("Filter by p-value", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
+                    dcc.Checklist(id="use_pval_filter_check", options=[{"label": " Enable p-value filtering", "value": "yes"}], value=[], style={"fontSize": "12px"}),
+
+                    html.Div(style={"height": "10px"}),
+                    html.Div("Minimum regulator score (if p-value filtering enabled)", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
                     dcc.Input(id="min_reg_score_in", type="number", value=0.0, min=0, step=0.01, style=INPUT_STYLE),
 
                     html.Div(style={"height": "10px"}),
                     html.Div("Minimum absolute edge score", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
-                    dcc.Input(id="min_abs_edge_score_in", type="number", value=0.0, min=0, step=0.01, style=INPUT_STYLE),
+                    dcc.Input(id="min_abs_edge_score_in", type="number", value=1.0, min=0, step=0.01, style=INPUT_STYLE),
 
                     html.Div(style={"height": "10px"}),
                     html.Div("Maximum visible nodes", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
@@ -2967,6 +2995,7 @@ def remember_selected_tab(tab_value):
     State("engine_choice", "value"),
     State("results_tab_store", "data"),
     State("top_n_regulators_in", "value"),
+    State("use_pval_filter_check", "value"),
     State("min_reg_score_in", "value"),
     State("min_abs_edge_score_in", "value"),
     State("max_nodes_in", "value"),
@@ -3060,7 +3089,7 @@ def poll(
     if state in ("queued", "running"):
         if outputs_ready:
             try:
-                zip_outputs(job.job_dir, job.zip_path, exclude_paths={job.zip_path})
+                zip_outputs(job.job_dir / "out", job.zip_path, exclude_paths={job.zip_path})
             except Exception:
                 pass
 
@@ -3118,14 +3147,14 @@ def poll(
         return fill, msg, blocks, b, f"Job {job_id}", "No outputs to download.", True
 
     try:
-     return _render_done(job_id, job, st, engine, current_tab, top_n_regulators, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs)
+     return _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs)
     except Exception as _done_exc:
         import traceback as _tb
         print(f"[POLL DONE ERROR] {_done_exc}", flush=True)
         print(_tb.format_exc(), flush=True)
         raise
 
-def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs):
+def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs):
     b = badge("Done", THEME["good"])
     out_dir = job.out_dir
 
@@ -3226,6 +3255,7 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, min_reg
         engine=engine,
         top_n=top_n_regulators,
         min_display_score=min_reg_score,
+        use_pval_filter="yes" in (use_pval_filter or []),
     )
 
     edge_display_df = prepare_edge_display_df(
@@ -3464,7 +3494,7 @@ def download_outputs_callback(n_clicks, job_id):
         return no_update
 
     try:
-        zip_outputs(job.job_dir, job.zip_path, exclude_paths={job.zip_path})
+        zip_outputs(job.job_dir / "out", job.zip_path, exclude_paths={job.zip_path})
         if not job.zip_path.exists():
             return no_update
         run_meta_fp = job.job_dir / "run_request.json"
