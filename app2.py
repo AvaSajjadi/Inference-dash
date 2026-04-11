@@ -3010,6 +3010,7 @@ def poll(
     engine,
     current_tab,
     top_n_regulators,
+    use_pval_filter,
     min_reg_score,
     min_abs_edge_score,
     max_nodes,
