@@ -41,6 +41,7 @@ EXPOSE 8080
 
 # Set environment
 ENV PORT=8080
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chmod 777 /app/uploads
