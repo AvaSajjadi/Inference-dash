@@ -29,9 +29,16 @@ COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Build nlbayes from source for the container's Python version
-# Cache bust: 2026-04-12-v2
-COPY nlbayes-python-src /tmp/nlbayes_src
-RUN cd /tmp/nlbayes_src && pip install --no-cache-dir --break-system-packages -e .
+# Cache bust: 2026-04-12-v4
+# Copy source to /app and build there so .so is in /app/nlbayes (which is in PYTHONPATH)
+COPY nlbayes-python-src /app/nlbayes-src
+WORKDIR /app/nlbayes-src
+RUN python3 setup.py build_ext --inplace
+RUN pip install --no-cache-dir --break-system-packages .
+RUN python3 -c "from nlbayes import ModelORNOR; print('[nlbayes] ✅ Build verified')"
+# Copy the compiled extension to /app/nlbayes for extra safety
+RUN cp -v nlbayes/ModelORNOR*.so /app/nlbayes/ 2>/dev/null || true
+WORKDIR /app
 
 # Install R packages (pass GITHUB_TOKEN if provided)
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
