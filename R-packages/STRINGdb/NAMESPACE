@@ -1,0 +1,26 @@
+export(
+  STRINGdb,
+  delColDf,
+  downloadAbsentFile,
+  downloadAbsentFileSTRING,
+  multi_map_df,
+  renameColDf
+)
+
+exportClasses(
+    STRINGdb
+)
+
+import(
+       RColorBrewer,
+       RCurl,
+       gplots,
+       hash,
+       igraph,
+       methods,
+       plyr,
+       png,
+       sqldf
+)
+
+importFrom(plotrix, color.scale)

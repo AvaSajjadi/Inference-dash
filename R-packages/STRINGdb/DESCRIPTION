@@ -1,0 +1,23 @@
+Package: STRINGdb
+Type: Package
+Title: STRINGdb - Protein-Protein Interaction Networks and Functional
+        Enrichment Analysis
+Version: 2.6.5
+Date: 2020-01-10
+Author: Andrea Franceschini <andrea.franceschini@isb-sib.ch>
+Maintainer: Damian Szklarczyk <damian.szklarczyk@imls.uzh.ch>
+Description: The STRINGdb package provides a R interface to the STRING protein-protein interactions database (https://string-db.org).
+License: GPL-2
+Depends: R (>= 2.14.0)
+Imports: png, sqldf, plyr, igraph, RCurl, methods, RColorBrewer,
+        gplots, hash, plotrix
+Suggests: RUnit, BiocGenerics
+biocViews: Network
+git_url: https://git.bioconductor.org/packages/STRINGdb
+git_branch: RELEASE_3_14
+git_last_commit: 9232960
+git_last_commit_date: 2022-03-12
+Date/Publication: 2022-03-17
+NeedsCompilation: no
+Packaged: 2022-03-17 09:56:57 UTC; biocbuild
+Built: R 4.1.2; ; 2025-11-18 19:24:05 UTC; unix

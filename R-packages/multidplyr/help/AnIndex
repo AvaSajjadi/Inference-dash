@@ -1,0 +1,17 @@
+multidplyr-package	multidplyr-package
+%>%	reexports
+cluster_assign	cluster_utils
+cluster_assign_each	cluster_utils
+cluster_assign_partition	cluster_utils
+cluster_call	cluster_call
+cluster_copy	cluster_utils
+cluster_library	cluster_utils
+cluster_rm	cluster_utils
+cluster_send	cluster_call
+cluster_utils	cluster_utils
+default_cluster	default_cluster
+multidplyr	multidplyr-package
+new_cluster	new_cluster
+partition	partition
+party_df	party_df
+reexports	reexports

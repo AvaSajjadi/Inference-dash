@@ -1,0 +1,39 @@
+Package: multidplyr
+Title: A Multi-Process 'dplyr' Backend
+Version: 0.1.4.9000
+Authors@R: c(
+    person("Hadley", "Wickham", , "hadley@posit.co", role = c("aut", "cre")),
+    person("Posit Software, PBC", role = c("cph", "fnd"))
+  )
+Description: Partition a data frame across multiple worker processes to
+    provide simple multicore parallelism.
+License: MIT + file LICENSE
+URL: https://multidplyr.tidyverse.org,
+        https://github.com/tidyverse/multidplyr
+BugReports: https://github.com/tidyverse/multidplyr/issues
+Depends: R (>= 3.6)
+Imports: callr (>= 3.5.1), cli, crayon, dplyr (>= 1.0.0), magrittr,
+        qs2, R6, rlang (>= 1.0.6), tibble, tidyselect, vctrs (>= 0.3.6)
+Suggests: covr, knitr, lubridate, mgcv, nycflights13, rmarkdown,
+        testthat (>= 3.0.2), vroom, withr
+VignetteBuilder: knitr
+Config/Needs/website: tidyverse/tidytemplate
+Config/testthat/edition: 3
+Encoding: UTF-8
+RoxygenNote: 7.3.3
+RemoteType: github
+RemoteHost: api.github.com
+RemoteRepo: multidplyr
+RemoteUsername: hadley
+RemoteRef: HEAD
+RemoteSha: e960a1e83f6a0dded147366053b1d057d46ad2f4
+GithubRepo: multidplyr
+GithubUsername: hadley
+GithubRef: HEAD
+GithubSHA1: e960a1e83f6a0dded147366053b1d057d46ad2f4
+NeedsCompilation: no
+Packaged: 2026-02-22 22:49:43 UTC; ava
+Author: Hadley Wickham [aut, cre],
+  Posit Software, PBC [cph, fnd]
+Maintainer: Hadley Wickham <hadley@posit.co>
+Built: R 4.1.2; ; 2026-02-22 22:49:43 UTC; unix

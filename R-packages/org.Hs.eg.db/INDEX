@@ -1,0 +1,51 @@
+org.Hs.eg.db            Bioconductor annotation data package
+org.Hs.egACCNUM         Map Entrez Gene identifiers to GenBank
+                        Accession Numbers
+org.Hs.egALIAS2EG       Map between Common Gene Symbol Identifiers and
+                        Entrez Gene
+org.Hs.egCHR            Map Entrez Gene IDs to Chromosomes
+org.Hs.egCHRLENGTHS     A named vector for the length of each of the
+                        chromosomes
+org.Hs.egCHRLOC         Entrez Gene IDs to Chromosomal Location
+org.Hs.egENSEMBL        Map Ensembl gene accession numbers with Entrez
+                        Gene identifiers
+org.Hs.egENSEMBLPROT    Map Ensembl protein acession numbers with
+                        Entrez Gene identifiers
+org.Hs.egENSEMBLTRANS   Map Ensembl transcript acession numbers with
+                        Entrez Gene identifiers
+org.Hs.egENZYME         Map between Entrez Gene IDs and Enzyme
+                        Commission (EC) Numbers
+org.Hs.egGENENAME       Map between Entrez Gene IDs and Genes
+org.Hs.egGENETYPE       Map between Entrez Gene Identifiers and Gene
+                        Type
+org.Hs.egGO             Maps between Entrez Gene IDs and Gene Ontology
+                        (GO) IDs
+org.Hs.egMAP            Map between Entrez Gene Identifiers and
+                        cytogenetic maps/bands
+org.Hs.egMAPCOUNTS      Number of mapped keys for the maps in package
+                        org.Hs.eg.db
+org.Hs.egOMIM           Map between Entrez Gene Identifiers and
+                        Mendelian Inheritance in Man (MIM) identifiers
+org.Hs.egORGANISM       The Organism for org.Hs.eg
+org.Hs.egPATH           Mappings between Entrez Gene identifiers and
+                        KEGG pathway identifiers
+org.Hs.egPFAM           Maps between Manufacturer Identifiers and PFAM
+                        Identifiers
+org.Hs.egPMID           Map between Entrez Gene Identifiers and PubMed
+                        Identifiers
+org.Hs.egPROSITE        Maps between Manufacturer Identifiers and
+                        PROSITE Identifiers
+org.Hs.egREFSEQ         Map between Entrez Gene Identifiers and RefSeq
+                        Identifiers
+org.Hs.egSYMBOL         Map between Entrez Gene Identifiers and Gene
+                        Symbols
+org.Hs.egUCSCKG         This mapping has been deprecated and will no
+                        longer be available after bioconductor 2.6.
+                        See the details section for how you can live
+                        without it.  For now, it is a map of UCSC
+                        "Known Gene" accession numbers with Entrez Gene
+                        identifiers
+org.Hs.egUNIPROT        Map Uniprot accession numbers with Entrez Gene
+                        identifiers
+org.Hs.eg_dbconn        Collect information about the package
+                        annotation DB

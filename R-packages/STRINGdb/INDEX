@@ -1,0 +1,68 @@
+STRINGdb-class          Class '"STRINGdb"'
+\S4method{add_diff_exp_color}{STRINGdb}
+                        add_diff_exp_color
+\S4method{add_proteins_description}{STRINGdb}
+                        add_proteins_description
+\S4method{get_aliases}{STRINGdb}
+                        get_aliases
+\S4method{get_annotations_desc}{STRINGdb}
+                        get_annotations_desc
+\S4method{get_annotations}{STRINGdb}
+                        get_annotations
+\S4method{get_bioc_graph}{STRINGdb}
+                        get_bioc_graph
+\S4method{get_clusters}{STRINGdb}
+                        get_clusters
+\S4method{get_enrichment}{STRINGdb}
+                        get_enrichment
+\S4method{get_graph}{STRINGdb}
+                        get_graph
+\S4method{get_homologs_besthits}{STRINGdb}
+                        get_homologs_besthits
+\S4method{get_interactions}{STRINGdb}
+                        get_interactions
+\S4method{get_link}{STRINGdb}
+                        get_link
+\S4method{get_neighbors}{STRINGdb}
+                        get_neighbors
+\S4method{get_paralogs}{STRINGdb}
+                        get_paralogs
+\S4method{get_png}{STRINGdb}
+                        get_png
+\S4method{get_ppi_enrichment}{STRINGdb}
+                        get_ppi_enrichment
+\S4method{get_proteins}{STRINGdb}
+                        get_proteins
+\S4method{get_subnetwork}{STRINGdb}
+                        get_subnetwork
+\S4method{get_summary}{STRINGdb}
+                        get_summary
+\S4method{get_term_proteins}{STRINGdb}
+                        get_term_proteins
+\S4method{load_all}{STRINGdb}
+                        load_all
+\S4method{load}{STRINGdb}
+                        load
+\S4method{map}{STRINGdb}
+                        map
+\S4method{mp}{STRINGdb}
+                        mp
+\S4method{plot_network}{STRINGdb}
+                        plot_network
+\S4method{post_payload}{STRINGdb}
+                        post_payload
+\S4method{remove_homologous_interactions}{STRINGdb}
+                        remove_homologous_interactions
+\S4method{set_background}{STRINGdb}
+                        set_background
+coeffOfvar              coeffOfvar
+delColDf                delColDf
+diff_exp_example1       example of microarray data (data processed from
+                        GEO GSE9008)
+downloadAbsentFile      downloadAbsentFile
+downloadAbsentFileSTRING
+                        downloadAbsentFileSTRING
+interactions_example    example of a protein-protein interactions
+                        sorted data frame
+multi_map_df            multi_map_df
+renameColDf             renameColDf

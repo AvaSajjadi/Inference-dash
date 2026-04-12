@@ -1,0 +1,44 @@
+Package: QuaternaryProd
+Type: Package
+Title: Computes the Quaternary Dot Product Scoring Statistic for Signed
+        and Unsigned Causal Graphs
+Version: 1.28.0
+Date: 2015-10-22
+Authors@R: c(
+    person("Carl Tony", "Fakhry", email = "cfakhry@cs.umb.edu", role = c("cre","aut")),
+    person("Ping", "Chen", role = "ths"),
+    person("Kourosh", "Zarringhalam", role = c("aut","ths")))
+Description: QuaternaryProd is an R package that performs causal reasoning on biological 
+             networks, including publicly available networks such as STRINGdb. QuaternaryProd 
+             is an open-source alternative to commercial products such as Inginuity Pathway 
+             Analysis. For a given a set of differentially expressed genes, QuaternaryProd 
+             computes the significance of upstream regulators in the network by performing causal
+             reasoning using the Quaternary Dot Product Scoring Statistic (Quaternary Statistic),
+             Ternary Dot product Scoring Statistic (Ternary Statistic) and Fisher's exact test
+	     (Enrichment test). The Quaternary Statistic handles signed, unsigned and ambiguous
+             edges in the network. Ambiguity arises when the direction of causality is unknown,
+             or when the source node (e.g., a protein) has edges with conflicting signs for the 
+	     same target gene. On the other hand, the Ternary Statistic provides causal reasoning
+             using the signed and unambiguous edges only. The Vignette provides more details on the
+             Quaternary Statistic and illustrates an example of how to perform causal reasoning
+             using STRINGdb. 
+License: GPL (>=3)
+biocViews: GraphAndNetwork, GeneExpression, Transcription
+Depends: R (>= 3.2.0), Rcpp (>= 0.11.3), dplyr, yaml (>= 2.1.18)
+Suggests: knitr
+LinkingTo: Rcpp
+VignetteBuilder: knitr
+RoxygenNote: 6.1.0
+Encoding: UTF-8
+git_url: https://git.bioconductor.org/packages/QuaternaryProd
+git_branch: RELEASE_3_14
+git_last_commit: 2814921
+git_last_commit_date: 2021-10-26
+Date/Publication: 2021-10-26
+NeedsCompilation: yes
+Packaged: 2021-10-26 22:32:46 UTC; biocbuild
+Author: Carl Tony Fakhry [cre, aut],
+  Ping Chen [ths],
+  Kourosh Zarringhalam [aut, ths]
+Maintainer: Carl Tony Fakhry <cfakhry@cs.umb.edu>
+Built: R 4.1.2; x86_64-pc-linux-gnu; 2026-02-22 23:00:34 UTC; unix

@@ -1,0 +1,21 @@
+citHeader("Thank you for using STRING. Please cite the paper below. ")
+
+citEntry(entry="article",
+        title = "The STRING database in 2021: customizable protein-protein networks, and functional characterization of user-uploaded gene/measurement sets.",
+        author = personList(  as.person("Damian Szklarczyk"), 
+                              as.person("Annika L Gable "),
+                              as.person("Katerina C Nastou"),
+                              as.person("David Lyon"),
+                              as.person("Rebecca Kirsch"),
+                              as.person("Sampo Pyysalo"),
+                              as.person("Nadezhda T Doncheva"),
+                              as.person("Marc Legeay"),
+                              as.person("Tao Fang"),
+                              as.person("Peer Bork"),
+                              as.person("Lars J Jensen"),
+                              as.person("Christian von Mering") ),
+        journal = "Nucleic Acids Research (Database issue)",
+        year = 2021,
+        volume = 49,
+        textVersion = paste("Szklarczyk D, Gable AL, Nastou KC, Lyon D, Kirsch R, Pyysalo S, Doncheva NT, Legeay M, Fang T, Bork P, Jensen LJ, von Mering C. 'The STRING database in 2021: customizable protein-protein networks, and functional characterization of user-uploaded gene/measurement sets.' Nucleic Acids Res. 2021 Jan 8;49(D1):D605-12") 
+)

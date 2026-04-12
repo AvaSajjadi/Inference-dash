@@ -1,0 +1,19 @@
+QP_Pmf                  Computes the probability mass function of the
+                        scores.
+QP_Probability          Computes the probability of a score.
+QP_Pvalue               Computes the p-value of a score.
+QP_SigPvalue            Computes the p-value for a statistically
+                        significant score.
+QP_Support              Computes the support for the scores.
+QuaternaryProd-package
+                        Computes the Quaternary Dot Product Scoring
+                        Statistic for Signed and Unsigned Causal Graphs
+RunCRE_HSAStringDB      This function runs a causal relation engine by
+                        computing the Quaternary Dot Product Scoring
+                        Statistic, Ternary Dot Product Scoring
+                        Statistic or the Enrichment test over the Homo
+                        Sapien STRINGdb causal network (version 10
+                        provided under the Creative Commons license:
+                        https://creativecommons.org/licenses/by/3.0/).
+                        Note that the user has the option of specifying
+                        other causal networks with this function.
