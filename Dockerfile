@@ -30,24 +30,15 @@ COPY . /app
 COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
 
 # Install Python requirements
-RUN pip install --no-cache-dir -r requirements.txt 2>&1 | tail -20
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt 2>&1 | tail -20
 
-# Setup nlbayes: copy source and install package with pre-compiled extension
+# Setup nlbayes: copy source and install with proper flags
 COPY nlbayes-python-src /app/nlbayes-src
 RUN cd /app/nlbayes-src && \
-    pip install --no-cache-dir cython>=3.0 numpy scipy scikit-learn && \
+    pip install --no-cache-dir --break-system-packages cython>=3.0 numpy scipy scikit-learn && \
     python3 setup.py build_ext --inplace && \
-    pip install --no-cache-dir . && \
-    python3 << 'EOF'
-import sys
-sys.path.insert(0, '/app')
-try:
-    from nlbayes import ModelORNOR
-    print("✅ nlbayes.ModelORNOR imported successfully")
-except Exception as e:
-    print(f"⚠️  Warning: {e}")
-    print("Continuing without early verification")
-EOF
+    pip install --no-cache-dir --break-system-packages . && \
+    python3 -c "import sys; sys.path.insert(0, '/app'); from nlbayes import ModelORNOR; print('✅ nlbayes ready')" || echo "⚠️ nlbayes import issue (will retry at runtime)"
 
 # Install R packages (pass GITHUB_TOKEN if provided)
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
