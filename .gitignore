@@ -34,3 +34,4 @@ tree_output.txt
 *.egg-info/
 dist/
 build/
+R-packages/*/extdata/*.sqlite
