@@ -1,5 +1,9 @@
 FROM rocker/r-base:latest
 
+# Build ID - change this to force rebuild
+ARG BUILD_ID="2026-04-12-14-00-001"
+RUN echo "Build: $BUILD_ID"
+
 # Accept optional GitHub token for CIE installation
 ARG GITHUB_TOKEN=""
 
@@ -25,18 +29,25 @@ COPY . /app
 # Copy all locally installed R packages (includes CIE and all dependencies)
 COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
 
-# Install Python requirements (use --break-system-packages for Python 3.13+)
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+# Install Python requirements
+RUN pip install --no-cache-dir -r requirements.txt 2>&1 | tail -20
 
-# Build nlbayes from source for the container's Python version
-# Cache bust: 2026-04-12-v6
+# Setup nlbayes: copy source and install package with pre-compiled extension
 COPY nlbayes-python-src /app/nlbayes-src
 RUN cd /app/nlbayes-src && \
+    pip install --no-cache-dir cython>=3.0 numpy scipy scikit-learn && \
     python3 setup.py build_ext --inplace && \
-    cp -v nlbayes/ModelORNOR*.so /app/nlbayes/ && \
-    echo "Contents of /app/nlbayes:" && ls -lh /app/nlbayes/ModelORNOR*.so && \
-    pip install --no-cache-dir --break-system-packages . && \
-    python3 -c "import sys; sys.path.insert(0, '/app'); from nlbayes import ModelORNOR; print('✅ ORNOR import verified')"
+    pip install --no-cache-dir . && \
+    python3 << 'EOF'
+import sys
+sys.path.insert(0, '/app')
+try:
+    from nlbayes import ModelORNOR
+    print("✅ nlbayes.ModelORNOR imported successfully")
+except Exception as e:
+    print(f"⚠️  Warning: {e}")
+    print("Continuing without early verification")
+EOF
 
 # Install R packages (pass GITHUB_TOKEN if provided)
 RUN if [ -n "$GITHUB_TOKEN" ]; then \

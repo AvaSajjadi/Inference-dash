@@ -3,11 +3,10 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'inference-dash-snowy-lake-6787'
-primary_region = 'ewr'
+app = 'inference-dash'
+primary_region = 'iad'
 
 [build]
-image = "registry.fly.io/inference-dash-snowy-lake-6787:latest"
 
 [http_service]
   internal_port = 8080
