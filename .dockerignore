@@ -10,3 +10,6 @@ node_modules
 *.csv
 results/
 .DS_Store
+--network
+uploads/
+.claude/
