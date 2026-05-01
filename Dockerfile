@@ -1,7 +1,7 @@
 FROM rocker/r-base:latest
 
 # Build ID - change this to force rebuild
-ARG BUILD_ID="2026-05-01-01"
+ARG BUILD_ID="2026-05-01-02"
 RUN echo "Build: $BUILD_ID"
 
 # Accept optional GitHub token for CIE installation
