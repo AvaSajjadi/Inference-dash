@@ -57,15 +57,32 @@ class ORNORInferenceParams:
 # ---------------------------------------------------------------------------
 
 def _import_model():
+    import sys
+    import importlib
+
+    # Add /app to path to ensure nlbayes can be found
+    if '/app' not in sys.path:
+        sys.path.insert(0, '/app')
+
     for pkg in ("ornor.ModelORNOR", "nlbayes.ModelORNOR"):
         try:
-            import importlib
             mod = importlib.import_module(pkg)
             cls = getattr(mod, "PyModelORNOR")
             print(f"[ORNOR adapter] loaded PyModelORNOR from '{pkg}'")
             return cls
-        except (ImportError, AttributeError):
+        except (ImportError, AttributeError) as e:
+            print(f"[ORNOR adapter] Failed to import {pkg}: {e}")
             continue
+
+    # If both fail, provide diagnostic info
+    print(f"[ORNOR adapter] Python path: {sys.path}")
+    print(f"[ORNOR adapter] nlbayes module locations:")
+    try:
+        import nlbayes
+        print(f"  nlbayes found at: {nlbayes.__file__}")
+    except ImportError as e:
+        print(f"  nlbayes not found: {e}")
+
     raise ImportError(
         "Cannot import PyModelORNOR from 'ornor.ModelORNOR' or 'nlbayes.ModelORNOR'."
     )
@@ -81,8 +98,13 @@ def _read_signature(path: str) -> pd.DataFrame:
     Detects columns: gene/entrez, pval, logfc/log2fc/fc/foldchange.
     Returns DataFrame with columns: gene (int), pval (float), logfc (float).
     """
-    sep = "\t" if (path.endswith(".tsv") or path.endswith(".txt")) else ","
-    df = pd.read_csv(path, sep=sep)
+    # Auto-detect delimiter: try comma first, fall back to tab if only 1 column parsed
+    try:
+        df = pd.read_csv(path, sep=",")
+        if df.shape[1] == 1:
+            df = pd.read_csv(path, sep="\t")
+    except Exception:
+        df = pd.read_csv(path, sep="\t")
 
     gene_col = pval_col = logfc_col = None
     for c in df.columns:

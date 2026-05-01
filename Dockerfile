@@ -1,21 +1,29 @@
 FROM rocker/r-base:latest
 
 # Build ID - change this to force rebuild
-ARG BUILD_ID="2026-04-12-14-00-001"
+ARG BUILD_ID="2026-05-01-01"
 RUN echo "Build: $BUILD_ID"
 
 # Accept optional GitHub token for CIE installation
 ARG GITHUB_TOKEN=""
 
 # Install Python and system dependencies
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-dev \
-    curl git \
+# Note: curl is already provided by rocker/r-base; installing it separately
+# causes libcurl4t64 version conflicts on newer Debian releases.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     libxml2-dev \
     build-essential \
     libgsl-dev \
     cython3 \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages separately; python3 and pip come from the rocker base.
+# python3-dev is needed to compile Cython extensions (nlbayes).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    || (apt-get install -y --no-install-recommends python3 python3-pip && rm -rf /var/lib/apt/lists/*)
 
 # Verify R installation
 RUN which R && R --version && which Rscript && Rscript --version

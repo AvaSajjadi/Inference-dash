@@ -266,25 +266,6 @@ cdef class PyModelORNOR:
         return df
 
 
-    def get_tf_activity_df(self):
-        """
-        Returns a DataFrame with X-node (TF activity) posteriors.
-        X-node is binary: state 0 = inactive, state 1 = active.
-        Columns: tf_id (str), p_active (float 0-1).
-        """
-        means = self.c_model.get_posterior_means("X")
-        active = {}  # tf_id -> p_active (state 1 mean)
-        for var_id, mu in means:
-            vid = var_id.decode("utf8")
-            # Format: "X_{uid}_0" or "X_{uid}_1"
-            if vid.endswith("_1"):
-                tf_uid = vid[2:-2]  # strip "X_" prefix and "_1" suffix
-                active[tf_uid] = float(mu)
-        rows = [(tf, p) for tf, p in active.items()]
-        df = pd.DataFrame(rows, columns=["tf_id", "p_active"])
-        df.sort_values("p_active", ascending=False, inplace=True, ignore_index=True)
-        return df
-
     # -----------------
     # Properties
     # -----------------

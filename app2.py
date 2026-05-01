@@ -1692,15 +1692,18 @@ def prepare_edge_display_df(
             # Get the top regulator IDs IN ORDER OF SIGNIFICANCE (from selected_tf_df)
             top_tf_ids_ordered = selected_tf_df[tf_id_col].astype(str).str.strip().tolist()
             print(f"[DEBUG-PREP] top regulators in order: {top_tf_ids_ordered[:5]}")
-            # For each top regulator, grab their best edge (before filtering by score)
+            # Allocate edges proportionally: divide max_edges evenly across TFs so every
+            # regulator gets multiple targets instead of just 1.
+            n_tfs = len(top_tf_ids_ordered)
+            alloc_per_tf = max(3, max_edges // n_tfs) if n_tfs > 0 else max_edges
             edges_per_tf = []
             found_regs = []
             for tf_id in top_tf_ids_ordered:
                 tf_edges = df[df[src_col].astype(str) == tf_id].sort_values("_abs_edge_score", ascending=False)
                 if not tf_edges.empty:
-                    edges_per_tf.append(tf_edges.iloc[0:1])
+                    edges_per_tf.append(tf_edges.iloc[0:alloc_per_tf])
                     found_regs.append(tf_id)
-            print(f"[DEBUG-PREP] searched for {top_tf_ids_ordered[:5]} in src_col={src_col!r}, found {found_regs}")
+            print(f"[DEBUG-PREP] searched for {top_tf_ids_ordered[:5]} in src_col={src_col!r}, found {found_regs} (alloc_per_tf={alloc_per_tf})")
 
             if edges_per_tf:
                 df_top_regs = pd.concat(edges_per_tf, ignore_index=True)
@@ -1711,8 +1714,12 @@ def prepare_edge_display_df(
     df = df.sort_values(["_abs_edge_score", "_tf_score"], ascending=[False, False]).copy()
 
     if max_edges > 0:
-        # Calculate how many remaining edges we can take
+        # Fill any remaining budget with high-score edges not already in df_top_regs
         remaining_budget = max(0, int(max_edges) - len(df_top_regs))
+        if remaining_budget > 0 and not df_top_regs.empty and src_col and trg_col:
+            _key = df[src_col].astype(str) + "||" + df[trg_col].astype(str)
+            _key_top = df_top_regs[src_col].astype(str) + "||" + df_top_regs[trg_col].astype(str)
+            df = df[~_key.isin(set(_key_top))].copy()
         df = df.head(remaining_budget).copy()
         # Combine: top regulator edges + remaining high-score edges
         if not df_top_regs.empty:
@@ -1899,6 +1906,7 @@ def build_regulatory_network_figure(
 
     print(f"[DEBUG-NET] max_regs={max_regs} regs_selected={regs[:5]} score_map_keys={list(tf_score_map.keys())[:5]}")
     tgts = sorted(tgts, key=lambda x: (-tgt_counts.get(x, 0), _best_label(x, target_name_map)))
+    tgts = tgts[:max_tgts]
 
     pos = {}
     left_x = -2.8
