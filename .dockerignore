@@ -13,3 +13,9 @@ results/
 --network
 uploads/
 .claude/
+nlbayes-python-src/venv/
+nlbayes-python-src/.venv/
+nlbayes-python-src/build/
+nlbayes-python-src/*.egg-info/
+nlbayes-python-src/UNKNOWN.egg-info/
+nlbayes-python-src/uv.lock
