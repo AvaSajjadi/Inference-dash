@@ -1,7 +1,7 @@
 FROM rocker/r-base:latest
 
 # Build ID - change this to force rebuild
-ARG BUILD_ID="2026-05-01-02"
+ARG BUILD_ID="2026-05-01-03"
 RUN echo "Build: $BUILD_ID"
 
 # Accept optional GitHub token for CIE installation
@@ -36,6 +36,11 @@ COPY . /app
 
 # Copy all locally installed R packages (includes CIE and all dependencies)
 COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
+
+# Force reinstall CRAN packages to ensure ABI compatibility with the current R build.
+# R-packages/ may contain binaries compiled for a different R version; reinstalling
+# dplyr and its C++ dependencies (rlang, vctrs, etc.) from source guarantees they load.
+RUN Rscript -e "install.packages(c('Rcpp','rlang','vctrs','cli','glue','lifecycle','pillar','tibble','dplyr','magrittr','data.table'), repos='https://cloud.r-project.org', quiet=FALSE)"
 
 # Install Python requirements
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt 2>&1 | tail -20
