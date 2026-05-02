@@ -13,7 +13,6 @@ results/
 --network
 uploads/
 .claude/
-R-packages/
 nlbayes-python-src/venv/
 nlbayes-python-src/.venv/
 nlbayes-python-src/build/
