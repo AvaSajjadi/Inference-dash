@@ -218,7 +218,11 @@ extract_pathways <- function(res) {
 }
 
 make_edges_from_signature <- function(sig_df, rels_clean, ents_clean, tf_df, p_thresh = 0.05, fc_thresh = log2(1.5)) {
-  sig_keep <- sig_df[which(sig_df$pval <= p_thresh & abs(sig_df$fc) >= fc_thresh), , drop = FALSE]
+  # Use ALL signature genes for edge visualization — CIE's significance scoring
+  # already accounts for which TFs explain the overall signature. Filtering
+  # targets again by p/FC here causes most TFs to vanish from the graph even
+  # when they have many correct predictions (e.g. YAP1 correct.pred=349).
+  sig_keep <- sig_df
   if (nrow(sig_keep) == 0) {
     return(data.frame(srcuid = integer(), trguid = integer(), score = integer()))
   }

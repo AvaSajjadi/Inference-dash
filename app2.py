@@ -1639,6 +1639,7 @@ def prepare_edge_display_df(
     selected_tf_df: pd.DataFrame,
     min_abs_edge_score: float,
     max_edges: int,
+    focus_tf_uid: Optional[str] = None,
 ) -> pd.DataFrame:
     if edge_df is None or edge_df.empty:
         return pd.DataFrame()
@@ -1672,6 +1673,14 @@ def prepare_edge_display_df(
 
     df["_abs_edge_score"] = df["_edge_score"].abs()
 
+    # Single-regulator focus mode: return all edges from that one TF
+    if focus_tf_uid:
+        focused = df[df[src_col] == str(focus_tf_uid)].copy()
+        focused = focused[focused["_abs_edge_score"] >= float(min_abs_edge_score)].copy()
+        focused = focused.sort_values("_abs_edge_score", ascending=False).reset_index(drop=True)
+        print(f"[DEBUG-PREP] focus mode uid={focus_tf_uid!r}, returning {len(focused)} edges")
+        return focused
+
     # Don't filter by selected TF here — let build_regulatory_network_figure
     # select regulators by significance from tf_score_map. This ensures top-significant
     # TFs always appear in the graph, even if they have few edges.
@@ -1692,18 +1701,43 @@ def prepare_edge_display_df(
             # Get the top regulator IDs IN ORDER OF SIGNIFICANCE (from selected_tf_df)
             top_tf_ids_ordered = selected_tf_df[tf_id_col].astype(str).str.strip().tolist()
             print(f"[DEBUG-PREP] top regulators in order: {top_tf_ids_ordered[:5]}")
-            # Allocate edges proportionally: divide max_edges evenly across TFs so every
-            # regulator gets multiple targets instead of just 1.
+
             n_tfs = len(top_tf_ids_ordered)
-            alloc_per_tf = max(3, max_edges // n_tfs) if n_tfs > 0 else max_edges
+            # Number of shared target genes to show on the right side of the graph
+            n_shared_targets = max(5, min(20, max_edges // max(1, n_tfs)))
+
+            # Find the top shared targets: genes regulated by the MOST of the top TFs.
+            # Only consider score=±1 edges (meaningful regulatory agreements/disagreements).
+            scored_df = df[df["_abs_edge_score"] >= float(min_abs_edge_score)].copy()
+            top_tf_set = set(top_tf_ids_ordered)
+            scored_for_tfs = scored_df[scored_df[src_col].astype(str).isin(top_tf_set)]
+
+            top_targets: set = set()
+            if not scored_for_tfs.empty and trg_col in scored_for_tfs.columns:
+                # Count how many distinct TFs regulate each target
+                tf_per_target = (
+                    scored_for_tfs.groupby(trg_col)[src_col]
+                    .nunique()
+                    .sort_values(ascending=False)
+                )
+                top_targets = set(tf_per_target.head(n_shared_targets).index.astype(str))
+
             edges_per_tf = []
             found_regs = []
             for tf_id in top_tf_ids_ordered:
-                tf_edges = df[df[src_col].astype(str) == tf_id].sort_values("_abs_edge_score", ascending=False)
+                # Only show edges from this TF to the shared top targets
+                if top_targets:
+                    tf_edges = scored_df[
+                        (scored_df[src_col].astype(str) == tf_id) &
+                        (scored_df[trg_col].astype(str).isin(top_targets))
+                    ].copy()
+                else:
+                    tf_edges = scored_df[scored_df[src_col].astype(str) == tf_id].copy()
+                tf_edges = tf_edges.sort_values("_abs_edge_score", ascending=False)
                 if not tf_edges.empty:
-                    edges_per_tf.append(tf_edges.iloc[0:alloc_per_tf])
+                    edges_per_tf.append(tf_edges)
                     found_regs.append(tf_id)
-            print(f"[DEBUG-PREP] searched for {top_tf_ids_ordered[:5]} in src_col={src_col!r}, found {found_regs} (alloc_per_tf={alloc_per_tf})")
+            print(f"[DEBUG-PREP] searched for {top_tf_ids_ordered[:5]} in src_col={src_col!r}, found {found_regs} (n_shared_targets={n_shared_targets})")
 
             if edges_per_tf:
                 df_top_regs = pd.concat(edges_per_tf, ignore_index=True)
@@ -1806,11 +1840,13 @@ def build_regulatory_network_figure(
     max_nodes: int = 40,
     label_top_hubs: int = 12,
     tf_score_map: Optional[Dict[str, float]] = None,
+    tf_npp_nmm_map: Optional[Dict[str, tuple]] = None,
 ) -> go.Figure:
     fig = go.Figure()
     tf_name_map = tf_name_map or {}
     tf_score_map = tf_score_map or {}
     target_name_map = target_name_map or {}
+    tf_npp_nmm_map = tf_npp_nmm_map or {}
 
     if edge_df is None or edge_df.empty:
         fig.update_layout(
@@ -1851,8 +1887,13 @@ def build_regulatory_network_figure(
     reg_counts = df["_src_uid"].value_counts().to_dict()
     tgt_counts = df["_trg_uid"].value_counts().to_dict()
 
-    max_regs = max(1, max_nodes // 2)
-    max_tgts = max(1, max_nodes // 2)
+    unique_regs_in_data = df["_src_uid"].nunique()
+    if unique_regs_in_data == 1:
+        max_regs = 1
+        max_tgts = df["_trg_uid"].nunique()  # show ALL targets in focus mode
+    else:
+        max_regs = max(1, max_nodes // 2)
+        max_tgts = max(1, max_nodes // 2)
 
     def _best_label(uid: str, mapping: Dict[str, str]) -> str:
         uid = str(uid).strip()
@@ -2017,7 +2058,14 @@ def build_regulatory_network_figure(
             textposition="middle left",
             textfont=dict(size=20, color=THEME["title"]),
             hovertemplate=[
-                f"regulator={_best_label(n, tf_name_map)}<br>uid={n}<br>degree={reg_counts.get(n, 0)}<extra></extra>"
+                (
+                    f"regulator={_best_label(n, tf_name_map)}<br>"
+                    f"uid={n}<br>"
+                    f"degree={reg_counts.get(n, 0)}<br>"
+                    f"npp (activation agreements)={tf_npp_nmm_map.get(str(n), (None, None))[0]}<br>"
+                    f"nmm (repression agreements)={tf_npp_nmm_map.get(str(n), (None, None))[1]}"
+                    f"<extra></extra>"
+                )
                 for n in regs
             ],
             name="regulators",
@@ -2045,9 +2093,10 @@ def build_regulatory_network_figure(
         )
     )
 
+    graph_height = max(980, max_tgts * 28) if unique_regs_in_data == 1 else 980
     fig.update_layout(
         title=title,
-        height=980,
+        height=graph_height,
         margin=dict(l=110, r=110, t=80, b=50),
         xaxis=dict(visible=False, range=[-4.1, 4.1]),
         yaxis=dict(visible=False, range=[-3.2, 3.2]),
@@ -2556,6 +2605,10 @@ app.layout = html.Div(
                     dcc.Input(id="label_top_hubs_in", type="number", value=12, min=0, step=1, style=INPUT_STYLE),
 
                     html.Div(style={"height": "10px"}),
+                    html.Div("Focus regulator (name or ID — leave blank for all)", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"]}),
+                    dcc.Input(id="focus_regulator_in", type="text", value="", placeholder="e.g. YAP1", style=INPUT_STYLE),
+
+                    html.Div(style={"height": "10px"}),
                     html.Button("Apply display filters", id="apply_display_btn", n_clicks=0, style={
                         "width": "100%", "padding": "8px", "background": THEME["blue"],
                         "color": "#fff", "border": "none", "borderRadius": "6px",
@@ -3036,6 +3089,7 @@ def remember_selected_tab(tab_value):
     State("max_nodes_in", "value"),
     State("max_edges_in", "value"),
     State("label_top_hubs_in", "value"),
+    State("focus_regulator_in", "value"),
     prevent_initial_call="initial_duplicate",
 )
 def poll(
@@ -3051,6 +3105,7 @@ def poll(
     max_nodes,
     max_edges,
     label_top_hubs,
+    focus_regulator,
 ):
     if not job_id:
         return (
@@ -3183,14 +3238,14 @@ def poll(
         return fill, msg, blocks, b, f"Job {job_id}", "No outputs to download.", True
 
     try:
-     return _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs)
+     return _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs, focus_regulator)
     except Exception as _done_exc:
         import traceback as _tb
         print(f"[POLL DONE ERROR] {_done_exc}", flush=True)
         print(_tb.format_exc(), flush=True)
         raise
 
-def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs):
+def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pval_filter, min_reg_score, min_abs_edge_score, max_nodes, max_edges, label_top_hubs, focus_regulator=None):
     b = badge("Done", THEME["good"])
     out_dir = job.out_dir
 
@@ -3225,7 +3280,7 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
     ornor_edge_fp = _find_first_existing([out_dir / "ornor_edges.csv", out_dir / "ornor_edges.tsv"])
 
     tf_df_raw = read_result_table(cie_tf_fp if engine == "CIE" else ornor_tf_fp)
-    edge_df_raw = read_result_table(cie_edge_fp if engine == "CIE" else ornor_edge_fp, nrows=5000)
+    edge_df_raw = read_result_table(cie_edge_fp if engine == "CIE" else ornor_edge_fp, nrows=500000)
     pathway_df = read_result_table(cie_pathway_fp if engine == "CIE" else None)
 
     run_meta_fp = _find_first_existing([out_dir / "cie_run_meta.json", job.job_dir / "run_request.json"])
@@ -3294,20 +3349,6 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
         use_pval_filter="yes" in (use_pval_filter or []),
     )
 
-    edge_display_df = prepare_edge_display_df(
-        edge_df=edge_df,
-        selected_tf_df=tf_display_df,
-        min_abs_edge_score=min_abs_edge_score,
-        max_edges=max_edges,
-    )
-    print(f"[DEBUG-EDGES] edge_df rows={len(edge_df)} edge_display_df rows={len(edge_display_df)} tf_display_df rows={len(tf_display_df)} tf_cols={list(tf_display_df.columns[:10])}")
-
-    tf_plot = regulator_bar_plot(
-        tf_df=tf_display_df,
-        score_label=tf_score_label,
-        title=("Top ORNOR regulators" if engine == "ORNOR" else "Top CIE regulators"),
-        top_n=max(1, int(top_n_regulators or 20)),
-    )
     _tf_id_col = coerce_first_existing_col(tf_display_df, ["TF", "tf", "source", "uid", "id"])
     _tf_score_map: Dict[str, float] = {}
     if _tf_id_col and not tf_display_df.empty and "display_score" in tf_display_df.columns:
@@ -3317,6 +3358,56 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
         ))
     print(f"[DEBUG] _tf_id_col={_tf_id_col!r} score_map_keys={list(_tf_score_map.keys())[:5]} cols={list(tf_display_df.columns[:8])}")
 
+    # Resolve focus regulator name/ID → network UID (the one used in edge src_col)
+    focus_tf_uid = None
+    if focus_regulator and str(focus_regulator).strip():
+        query = str(focus_regulator).strip().lower()
+        # Search tf_score_map keys — these are the actual network UIDs in the edge data
+        for uid in _tf_score_map.keys():
+            name = tf_name_map.get(str(uid), str(uid))
+            if name.strip().lower() == query or str(uid).strip().lower() == query:
+                focus_tf_uid = uid
+                break
+        # Broader fallback: scan all unique source UIDs in the raw edge data
+        if not focus_tf_uid and edge_df is not None and not edge_df.empty:
+            _foc_src = coerce_first_existing_col(edge_df, ["source", "srcuid", "src"])
+            if _foc_src:
+                for uid in edge_df[_foc_src].astype(str).str.strip().unique():
+                    name = tf_name_map.get(uid, uid)
+                    if name.strip().lower() == query or uid.lower() == query:
+                        focus_tf_uid = uid
+                        break
+        print(f"[DEBUG] focus_regulator={focus_regulator!r} resolved to uid={focus_tf_uid!r}")
+
+    edge_display_df = prepare_edge_display_df(
+        edge_df=edge_df,
+        selected_tf_df=tf_display_df,
+        min_abs_edge_score=min_abs_edge_score,
+        max_edges=max_edges,
+        focus_tf_uid=focus_tf_uid,
+    )
+    print(f"[DEBUG-EDGES] edge_df rows={len(edge_df)} edge_display_df rows={len(edge_display_df)} tf_display_df rows={len(tf_display_df)} tf_cols={list(tf_display_df.columns[:10])}")
+
+    tf_plot = regulator_bar_plot(
+        tf_df=tf_display_df,
+        score_label=tf_score_label,
+        title=("Top ORNOR regulators" if engine == "ORNOR" else "Top CIE regulators"),
+        top_n=max(1, int(top_n_regulators or 20)),
+    )
+
+    # Build npp/nmm map for hover display
+    _tf_npp_nmm_map: Dict[str, tuple] = {}
+    if _tf_id_col and not tf_display_df.empty:
+        npp_col = coerce_first_existing_col(tf_display_df, ["npp"])
+        nmm_col = coerce_first_existing_col(tf_display_df, ["nmm"])
+        if npp_col and nmm_col:
+            for _, row in tf_display_df.iterrows():
+                uid = str(row[_tf_id_col]).strip()
+                _tf_npp_nmm_map[uid] = (
+                    int(row[npp_col]) if pd.notna(row[npp_col]) else None,
+                    int(row[nmm_col]) if pd.notna(row[nmm_col]) else None,
+                )
+
     network_fig = build_regulatory_network_figure(
         edge_df=edge_display_df,
         tf_name_map=tf_name_map,
@@ -3325,6 +3416,7 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
         max_nodes=max(1, int(max_nodes or 40)),
         label_top_hubs=max(1, int(label_top_hubs or 12)),
         tf_score_map=_tf_score_map,
+        tf_npp_nmm_map=_tf_npp_nmm_map,
     )
     pathway_plot = pathway_bar_plot(pathway_df if engine == "CIE" else pd.DataFrame(), top_n=20)
     try:
