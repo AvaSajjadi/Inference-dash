@@ -83,6 +83,10 @@ JOBS_DIR.mkdir(parents=True, exist_ok=True)
 CIE_RUNNER = ROOT / "backend" / "engines" / "cie" / "run_cie.R"
 ORNOR_RUNNER = ROOT / "backend" / "engines" / "ornor" / "run_ornor_real.py"
 
+# Only one CIE job may run at a time — R's Bioconductor stack uses ~3 GB peak;
+# concurrent runs would exceed the 4 GB machine limit and cause a host OOM kill.
+_cie_semaphore = threading.Semaphore(1)
+
 PROGRESS_RE = re.compile(r"PROGRESS:\s*(\d{1,3})\b", re.IGNORECASE)
 
 
@@ -1426,7 +1430,11 @@ def job_thread(
 
             print(f"[CIE] Using Rscript: {rscript_path}", flush=True)
             cmd = [
-                rscript_path, str(CIE_RUNNER),
+                rscript_path,
+                # Cap R's vector heap so an oversized run fails with an R error
+                # instead of OOM-killing the entire host machine.
+                "--max-vsize=3500M",
+                str(CIE_RUNNER),
                 "-s", str(in_path),
                 "-o", str(out_edges),
                 "--rels", str(rels_path),
@@ -1439,7 +1447,17 @@ def job_thread(
                 "-u", "1",
                 "-c", "1",
             ]
-            rc, last = run_with_progress(cmd, job)
+            # Serialise CIE runs: R's Bioconductor stack uses ~3 GB peak, so
+            # two simultaneous runs would exceed the 4 GB host limit.
+            acquired = _cie_semaphore.acquire(blocking=False)
+            if not acquired:
+                write_status(job, state="running", progress=1, message="Waiting for another CIE run to finish...")
+                print("[CIE] Semaphore busy — queuing job", flush=True)
+                _cie_semaphore.acquire(blocking=True)
+            try:
+                rc, last = run_with_progress(cmd, job)
+            finally:
+                _cie_semaphore.release()
             if rc != 0:
                 write_status(job, state="error", message=f"CIE failed (rc={rc}). {last}")
                 return
@@ -2657,6 +2675,17 @@ app.layout = html.Div(
 @app.callback(Output("custom_network_box", "style"), Input("network_choice", "value"))
 def toggle_custom(choice):
     return {"marginTop": "12px", "display": "block"} if choice == "__UPLOAD__" else {"marginTop": "12px", "display": "none"}
+
+
+@app.callback(
+    Output("min_abs_edge_score_in", "value"),
+    Input("engine_choice", "value"),
+    prevent_initial_call=True,
+)
+def reset_edge_score_threshold(engine):
+    # ORNOR scores = X_tf * mor ∈ (-1, +1) — continuous, rarely reach ±1.
+    # CIE scores ∈ {-1, 0, +1} — threshold=1.0 correctly hides 0-score edges.
+    return 0.0 if engine == "ORNOR" else 1.0
 
 
 @app.callback(
