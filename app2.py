@@ -2457,8 +2457,7 @@ app.layout = html.Div(
                 "overflowY": "auto",
             },
             children=[
-                html.Div("Inference Dash", style={"fontSize": "24px", "fontWeight": "900", "color": THEME["title"]}),
-                html.Div("Research workflow for regulatory inference with CIE and ORNOR.", style={"color": THEME["muted"], "marginBottom": "14px"}),
+                html.Img(src="/assets/inference_logo.svg", style={"width": "100%", "maxWidth": "340px", "marginBottom": "14px", "display": "block"}),
 
                 dcc.Store(id="expr_path_store"),
                 dcc.Store(id="expr_meta_store"),
