@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for inference-dash-snowy-lake-6787 on 2026-04-11T20:49:56-04:00
+# fly.toml app configuration file generated for inference-dash on 2026-06-08T22:45:59Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -14,7 +14,6 @@ primary_region = 'iad'
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 1
-  max_machines_running = 1
   processes = ['app']
 
 [[vm]]
