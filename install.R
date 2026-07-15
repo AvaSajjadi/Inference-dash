@@ -11,18 +11,15 @@ for (pkg in packages) {
     }
 }
 
-# CIE package installation
-cat("Installing remotes and devtools...\n")
+# CIE package installation — use remotes only (devtools has a heavy dep tree
+# that needs fontconfig/freetype dev headers not available on this base image)
+cat("Checking remotes...\n")
 if (!require("remotes", character.only = TRUE, quietly = TRUE)) {
     install.packages("remotes", repos="https://cloud.r-project.org", quiet = FALSE)
-}
-if (!require("devtools", character.only = TRUE, quietly = TRUE)) {
-    install.packages("devtools", repos="https://cloud.r-project.org", quiet = FALSE)
 }
 
 cat("Installing CIE...\n")
 if (!require("CIE", character.only = TRUE, quietly = TRUE)) {
-    # Set GitHub PAT if available (from Docker build arg)
     github_pat <- Sys.getenv("GITHUB_PAT", "")
     if (nzchar(github_pat)) {
         cat("Using GitHub Personal Access Token for authentication\n")
@@ -36,8 +33,7 @@ if (!require("CIE", character.only = TRUE, quietly = TRUE)) {
     }, error = function(e) {
         cat("Warning: CIE installation failed:", e$message, "\n")
         cat("To install CIE, provide a GitHub token at build time:\n")
-        cat("  docker build --build-arg GITHUB_TOKEN=<your-token> -t inference-dash .\n")
-        cat("Or install locally: remotes::install_github('cansylab/CIE')\n")
+        cat("  fly deploy --build-arg GITHUB_TOKEN=<your-token>\n")
         cat("Continuing without CIE. ORNOR analysis will work.\n")
     })
 }

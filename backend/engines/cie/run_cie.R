@@ -72,7 +72,7 @@ normalize_database_type <- function(x) {
   x
 }
 
-ensure_signature <- function(sig) {
+ensure_signature <- function(sig, organism = "human") {
   colnames(sig) <- tolower(colnames(sig))
 
   entrez_col <- pick_first_col(sig, c("entrez", "entrez_id", "entrezid", "geneid", "gene_id"))
@@ -87,8 +87,15 @@ ensure_signature <- function(sig) {
     pval_col <- "pval"
   }
 
+  if (organism == "toxoplasma") {
+    entrez_vals <- as.character(sig[[entrez_col]])
+    entrez_vals[!nzchar(entrez_vals) | entrez_vals == "NA"] <- NA
+  } else {
+    entrez_vals <- suppressWarnings(as.integer(sig[[entrez_col]]))
+  }
+
   out <- data.frame(
-    entrez = suppressWarnings(as.integer(sig[[entrez_col]])),
+    entrez = entrez_vals,
     fc     = suppressWarnings(as.numeric(sig[[fc_col]])),
     pval   = suppressWarnings(as.numeric(sig[[pval_col]])),
     stringsAsFactors = FALSE
@@ -217,7 +224,7 @@ extract_pathways <- function(res) {
   data.frame()
 }
 
-make_edges_from_signature <- function(sig_df, rels_clean, ents_clean, tf_df, p_thresh = 0.05, fc_thresh = log2(1.5)) {
+make_edges_from_signature <- function(sig_df, rels_clean, ents_clean, tf_df, p_thresh = 0.05, fc_thresh = log2(1.5), organism = "human") {
   # Use ALL signature genes for edge visualization — CIE's significance scoring
   # already accounts for which TFs explain the overall signature. Filtering
   # targets again by p/FC here causes most TFs to vanish from the graph even
@@ -230,15 +237,25 @@ make_edges_from_signature <- function(sig_df, rels_clean, ents_clean, tf_df, p_t
   sig_keep$sign <- ifelse(sig_keep$fc > 0, 1L, ifelse(sig_keep$fc < 0, -1L, 0L))
 
   ents_map <- ents_clean
-  ents_map$id_num <- suppressWarnings(as.integer(ents_map$id))
 
-  mapped <- merge(
-    sig_keep,
-    ents_map[, c("uid", "id_num"), drop = FALSE],
-    by.x = "entrez",
-    by.y = "id_num",
-    all = FALSE
-  )
+  if (organism == "toxoplasma") {
+    mapped <- merge(
+      sig_keep,
+      ents_map[, c("uid", "id"), drop = FALSE],
+      by.x = "entrez",
+      by.y = "id",
+      all = FALSE
+    )
+  } else {
+    ents_map$id_num <- suppressWarnings(as.integer(ents_map$id))
+    mapped <- merge(
+      sig_keep,
+      ents_map[, c("uid", "id_num"), drop = FALSE],
+      by.x = "entrez",
+      by.y = "id_num",
+      all = FALSE
+    )
+  }
 
   if (nrow(mapped) == 0) {
     return(data.frame(srcuid = integer(), trguid = integer(), score = integer()))
@@ -291,6 +308,75 @@ make_edges_from_signature <- function(sig_df, rels_clean, ents_clean, tf_df, p_t
 }
 
 # ------------------------------------------------------------
+# Custom enrichment (used for non-human organisms — bypasses
+# CIE's hard-coded human Entrez ID validation)
+# ------------------------------------------------------------
+run_custom_enrichment <- function(sig_df, ents_df, rels_df, organism = "human") {
+  # Map signature gene IDs to entity UIDs
+  if (organism == "toxoplasma") {
+    id_to_uid <- setNames(ents_df$uid, as.character(ents_df$id))
+    sig_df$uid <- id_to_uid[as.character(sig_df$entrez)]
+  } else {
+    id_to_uid <- setNames(ents_df$uid, as.character(suppressWarnings(as.integer(ents_df$id))))
+    sig_df$uid <- id_to_uid[as.character(sig_df$entrez)]
+  }
+
+  sig_df <- sig_df[!is.na(sig_df$uid), , drop = FALSE]
+  if (nrow(sig_df) == 0) {
+    cat("WARNING: No signature genes matched entity IDs — check that gene IDs match the network\n")
+    return(data.frame())
+  }
+
+  sig_df$obs_sign <- ifelse(sig_df$fc > 0, 1L, -1L)
+
+  rels_df$rel_sign <- ifelse(
+    tolower(rels_df$type) %in% c("increase", "increases", "activation", "activates", "up"), 1L,
+    ifelse(
+      tolower(rels_df$type) %in% c("decrease", "decreases", "repression", "represses", "down"), -1L,
+      0L
+    )
+  )
+  rels_df <- rels_df[rels_df$rel_sign != 0L, , drop = FALSE]
+
+  tfs <- unique(rels_df$srcuid)
+
+  results <- lapply(tfs, function(tf_uid) {
+    tf_rels     <- rels_df[rels_df$srcuid == tf_uid, , drop = FALSE]
+    pred_up     <- tf_rels$trguid[tf_rels$rel_sign ==  1L]
+    pred_down   <- tf_rels$trguid[tf_rels$rel_sign == -1L]
+
+    sig_up_uid   <- sig_df$uid[sig_df$obs_sign ==  1L]
+    sig_down_uid <- sig_df$uid[sig_df$obs_sign == -1L]
+
+    correct   <- sum(sig_up_uid %in% pred_up) + sum(sig_down_uid %in% pred_down)
+    incorrect <- sum(sig_up_uid %in% pred_down) + sum(sig_down_uid %in% pred_up)
+    n_matched <- correct + incorrect
+
+    if (n_matched < 3L) return(NULL)
+
+    pval <- binom.test(correct, n_matched, p = 0.5, alternative = "greater")$p.value
+
+    tf_row  <- ents_df[ents_df$uid == tf_uid, , drop = FALSE]
+    tf_name <- if (nrow(tf_row) > 0) tf_row$name[1] else as.character(tf_uid)
+    tf_id   <- if (nrow(tf_row) > 0) tf_row$id[1]   else as.character(tf_uid)
+
+    data.frame(
+      uid          = tf_uid,
+      symbol       = tf_name,
+      id           = tf_id,
+      correct.pred = correct,
+      n.targets    = n_matched,
+      pvalue       = pval,
+      stringsAsFactors = FALSE
+    )
+  })
+
+  out <- do.call(rbind, Filter(Negate(is.null), results))
+  if (is.null(out) || nrow(out) == 0L) return(data.frame())
+  out[order(out$pvalue), , drop = FALSE]
+}
+
+# ------------------------------------------------------------
 # Args
 # ------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
@@ -303,6 +389,7 @@ ents_file <- get_arg(args, "--ents")
 db_arg    <- get_arg(args, "--db", "tcChIP")
 tissue    <- get_arg(args, "--tissue", "all")
 method    <- normalize_method(get_arg(args, "-m", "Fisher"))
+organism  <- get_arg(args, "--organism", "human")
 
 p_thresh <- suppressWarnings(as.numeric(get_arg(args, "-p", "0.05")))
 if (is.na(p_thresh)) p_thresh <- 0.05
@@ -327,9 +414,10 @@ ents_raw <- read_any(ents_file)
 
 cat("PROGRESS: 10\n")
 
-sig_df  <- ensure_signature(sig_raw)
-rels_df <- ensure_rels(rels_raw)
-ents_df <- ensure_ents(ents_raw, rels_df)
+sig_df  <- ensure_signature(sig_raw, organism);  rm(sig_raw)
+rels_df <- ensure_rels(rels_raw);      rm(rels_raw)
+ents_df <- ensure_ents(ents_raw, rels_df); rm(ents_raw)
+invisible(gc())
 
 cat("PROGRESS: 18\n")
 
@@ -338,33 +426,40 @@ cat("PROGRESS: 18\n")
 fc_thresh_log2 <- log2(fc_thresh_user)
 
 # ------------------------------------------------------------
-# Real CIE call
+# Run enrichment analysis
 # ------------------------------------------------------------
-res <- runCIE(
-  databaseType = normalize_database_type(db_arg),
-  filter = TRUE,
-  DGEs = sig_df,
-  p.thresh = p_thresh,
-  fc.thresh = fc_thresh_log2,
-  logFC = TRUE,
-  methods = method,
-  ents = ents_df,
-  rels = rels_df,
-  useFile = FALSE,
-  verbose = FALSE,
-  numCores = 1
-)
+if (organism == "toxoplasma") {
+  cat("PROGRESS: 20\n")
+  tf_df <- run_custom_enrichment(sig_df, ents_df, rels_df, organism = organism)
+  if (is.null(tf_df) || !is.data.frame(tf_df)) tf_df <- data.frame()
+  pathway_df <- data.frame()
+  cat("PROGRESS: 25\n")
+} else {
+  res <- runCIE(
+    databaseType = normalize_database_type(db_arg),
+    filter = TRUE,
+    DGEs = sig_df,
+    p.thresh = p_thresh,
+    fc.thresh = fc_thresh_log2,
+    logFC = TRUE,
+    methods = method,
+    ents = ents_df,
+    rels = rels_df,
+    useFile = FALSE,
+    verbose = FALSE,
+    numCores = 1
+  )
 
-cat("PROGRESS: 25\n")
+  cat("PROGRESS: 25\n")
 
-# ------------------------------------------------------------
-# Extract outputs
-# ------------------------------------------------------------
-tf_df <- extract_regulators(res)
-if (is.null(tf_df) || !is.data.frame(tf_df)) tf_df <- data.frame()
+  tf_df <- extract_regulators(res)
+  if (is.null(tf_df) || !is.data.frame(tf_df)) tf_df <- data.frame()
 
-pathway_df <- extract_pathways(res)
-if (is.null(pathway_df) || !is.data.frame(pathway_df)) pathway_df <- data.frame()
+  pathway_df <- extract_pathways(res)
+  if (is.null(pathway_df) || !is.data.frame(pathway_df)) pathway_df <- data.frame()
+
+  rm(res); invisible(gc())
+}
 
 edge_df <- make_edges_from_signature(
   sig_df = sig_df,
@@ -372,7 +467,8 @@ edge_df <- make_edges_from_signature(
   ents_clean = ents_df,
   tf_df = tf_df,
   p_thresh = p_thresh,
-  fc_thresh = fc_thresh_log2
+  fc_thresh = fc_thresh_log2,
+  organism = organism
 )
 
 # ------------------------------------------------------------

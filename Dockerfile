@@ -1,9 +1,5 @@
 FROM rocker/r-base:latest
 
-# Build ID - change this to force rebuild
-ARG BUILD_ID="2026-05-01-04"
-RUN echo "Build: $BUILD_ID"
-
 # Accept optional GitHub token for CIE installation
 ARG GITHUB_TOKEN=""
 
@@ -13,6 +9,8 @@ ARG GITHUB_TOKEN=""
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     libxml2-dev \
+    libcurl4-gnutls-dev \
+    libuv1-dev \
     build-essential \
     libgsl-dev \
     cython3 \
@@ -28,11 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Verify R installation
 RUN which R && R --version && which Rscript && Rscript --version
 
-# Set working directory
 WORKDIR /app
 
-# Copy app files
-COPY . /app
+# ── R SLOW ZONE ────────────────────────────────────────────────────────────────
+# These layers are cached as long as R-packages/ doesn't change.
+# Placing them before COPY . /app means Python-only edits never bust this cache.
 
 # Copy all locally installed R packages (includes CIE and all dependencies)
 COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
@@ -41,6 +39,14 @@ COPY --chown=root:root R-packages/ /usr/local/lib/R/site-library/
 # R-packages/ may contain binaries compiled for a different R version; checkBuilt=TRUE
 # detects and reinstalls all such packages from CRAN automatically.
 RUN Rscript -e "update.packages(ask=FALSE, checkBuilt=TRUE, repos='https://cloud.r-project.org')"
+
+# ── PYTHON / APP FAST ZONE ─────────────────────────────────────────────────────
+# BUILD_ID busts only the layers below — R compilation above stays cached.
+ARG BUILD_ID="2026-05-03-09"
+RUN echo "Build: $BUILD_ID"
+
+# Copy app files
+COPY . /app
 
 # Install Python requirements
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt 2>&1 | tail -20

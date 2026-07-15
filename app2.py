@@ -135,6 +135,15 @@ DEFAULT_NETWORKS: Dict[str, Dict[str, str]] = {
         ),
         "entities": None,
     },
+
+    "Toxoplasma gondii CIE (TgAP2XII-9 direct targets)": {
+        "rels": first_existing(
+            NETWORKS_DIR / "toxo_ap2xii9.rels",
+        ),
+        "entities": first_existing(
+            NETWORKS_DIR / "toxo_ap2xii9.ents",
+        ),
+    },
 }
 
 
@@ -1024,6 +1033,7 @@ def normalize_signature_for_engine(
     abs_fc_thresh: Optional[float],
     use_pval_filter: bool,
     use_abs_fc_filter: bool,
+    organism: str = "human",
 ) -> Dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     df, sep = read_signature_file(raw_path)
@@ -1091,7 +1101,11 @@ def normalize_signature_for_engine(
         norm["gene"] = ""
 
     if entrez_col:
-        norm["entrez"] = pd.to_numeric(df[entrez_col], errors="coerce")
+        if organism == "toxoplasma":
+            raw = df[entrez_col].astype(str).str.strip()
+            norm["entrez"] = raw.where(raw.ne("") & raw.ne("nan") & raw.ne("None"))
+        else:
+            norm["entrez"] = pd.to_numeric(df[entrez_col], errors="coerce")
     elif gene_col:
         # Auto-convert gene symbols to Entrez IDs
         print(f"[ORNOR] No entrez column mapped — attempting symbol->Entrez conversion")
@@ -1169,9 +1183,12 @@ def normalize_signature_for_engine(
     if engine == "CIE":
         # Send full signature to CIE — let CIE apply pval/FC filtering internally
         cie_df = norm.copy()
-        cie_df["entrez"] = pd.to_numeric(cie_df["entrez"], errors="coerce")
-        cie_df = cie_df[cie_df["entrez"].notna() & cie_df["fc"].notna()].copy()
-        cie_df["entrez"] = cie_df["entrez"].astype("Int64")
+        if organism == "toxoplasma":
+            cie_df = cie_df[cie_df["entrez"].notna() & cie_df["fc"].notna()].copy()
+        else:
+            cie_df["entrez"] = pd.to_numeric(cie_df["entrez"], errors="coerce")
+            cie_df = cie_df[cie_df["entrez"].notna() & cie_df["fc"].notna()].copy()
+            cie_df["entrez"] = cie_df["entrez"].astype("Int64")
         print(f"[CIE] sending {len(cie_df)} genes to CIE (unfiltered, CIE handles thresholds internally)")
         cie_write = cie_df[["entrez", "fc", "pval"]].copy()
         cie_write.columns = ["entrez", "fc", "pval"]
@@ -1181,19 +1198,22 @@ def normalize_signature_for_engine(
     if engine == "ORNOR":
         ornor_df = filtered.copy()
 
-        ornor_df["entrez"] = pd.to_numeric(ornor_df.get("entrez"), errors="coerce")
-        before_ornor_rows = int(len(ornor_df))
-        ornor_df = ornor_df[ornor_df["entrez"].notna() & (ornor_df["entrez"] != 0)].copy()
-        dropped_bad_entrez = before_ornor_rows - int(len(ornor_df))
-        if dropped_bad_entrez > 0:
-            warnings.append(
-                f"Removed {dropped_bad_entrez} ORNOR rows with missing/zero Entrez IDs because the selected ORNOR network uses Entrez targets."
-            )
+        if organism == "toxoplasma":
+            # Keep string IDs as-is; ORNOR network must use matching identifiers
+            ornor_df = ornor_df[ornor_df["entrez"].notna()].copy()
+        else:
+            ornor_df["entrez"] = pd.to_numeric(ornor_df.get("entrez"), errors="coerce")
+            before_ornor_rows = int(len(ornor_df))
+            ornor_df = ornor_df[ornor_df["entrez"].notna() & (ornor_df["entrez"] != 0)].copy()
+            dropped_bad_entrez = before_ornor_rows - int(len(ornor_df))
+            if dropped_bad_entrez > 0:
+                warnings.append(
+                    f"Removed {dropped_bad_entrez} ORNOR rows with missing/zero Entrez IDs because the selected ORNOR network uses Entrez targets."
+                )
+            if not ornor_df.empty:
+                ornor_df["entrez"] = ornor_df["entrez"].astype("Int64")
 
-        if not ornor_df.empty:
-            ornor_df["entrez"] = ornor_df["entrez"].astype("Int64")
-            ornor_df = ornor_df.rename(columns={"fc": "logfc"})
-
+        ornor_df = ornor_df.rename(columns={"fc": "logfc"})
         ornor_write = ornor_df[["entrez", "logfc", "pval"]].copy()
         ornor_write = ornor_write.reset_index(drop=True)
         ornor_write.to_csv(ornor_input_path, sep="\t", index=False)
@@ -1339,6 +1359,7 @@ def job_thread(
     log2fc_thresh: float = 0.5,
     skip_mcmc: bool = False,
     original_filename: str = "",
+    organism: str = "human",
 ):
     job = _job_paths(job_id)
     job.job_dir.mkdir(parents=True, exist_ok=True)
@@ -1431,9 +1452,6 @@ def job_thread(
             print(f"[CIE] Using Rscript: {rscript_path}", flush=True)
             cmd = [
                 rscript_path,
-                # Cap R's vector heap so an oversized run fails with an R error
-                # instead of OOM-killing the entire host machine.
-                "--max-vsize=3500M",
                 str(CIE_RUNNER),
                 "-s", str(in_path),
                 "-o", str(out_edges),
@@ -1446,6 +1464,7 @@ def job_thread(
                 "-f", str(log2fc_thresh),
                 "-u", "1",
                 "-c", "1",
+                "--organism", organism,
             ]
             # Serialise CIE runs: R's Bioconductor stack uses ~3 GB peak, so
             # two simultaneous runs would exceed the 4 GB host limit.
@@ -1874,7 +1893,7 @@ def build_regulatory_network_figure(
             plot_bgcolor="white",
             paper_bgcolor="white",
         )
-        return fig
+        return fig, 980
 
     df = edge_df.copy()
     df.columns = [strip_bom_text(c) for c in df.columns]
@@ -1891,7 +1910,7 @@ def build_regulatory_network_figure(
             plot_bgcolor="white",
             paper_bgcolor="white",
         )
-        return fig
+        return fig, 980
 
     df["_src_uid"] = df[src_col].astype(str).str.strip()
     df["_trg_uid"] = df[trg_col].astype(str).str.strip()
@@ -2129,7 +2148,7 @@ def build_regulatory_network_figure(
             borderwidth=1,
         ),
     )
-    return fig
+    return fig, graph_height
 
 
 def make_summary_cards(summary: Dict[str, str]) -> html.Div:
@@ -2474,7 +2493,19 @@ app.layout = html.Div(
                         value="CIE",
                         labelStyle={"display": "block", "margin": "8px 0", "fontWeight": "700", "color": THEME["text"]},
                         inputStyle={"marginRight": "10px"},
-                    )
+                    ),
+                    html.Hr(style={"margin": "10px 0", "borderColor": "#ddd"}),
+                    html.Div("Organism", style={"fontWeight": "800", "fontSize": "12px", "color": THEME["muted"], "marginBottom": "4px"}),
+                    dcc.RadioItems(
+                        id="organism_choice",
+                        options=[
+                            {"label": " Human", "value": "human"},
+                            {"label": " Toxoplasma gondii", "value": "toxoplasma"},
+                        ],
+                        value="human",
+                        labelStyle={"display": "block", "margin": "6px 0", "fontWeight": "700", "color": THEME["text"]},
+                        inputStyle={"marginRight": "10px"},
+                    ),
                 ]),
 
                 card("2) Expression file (required)", [
@@ -2817,6 +2848,7 @@ def populate_mapping_dropdowns(meta):
     Output("validation_inline_hint", "children"),
     Input("expr_meta_store", "data"),
     Input("engine_choice", "value"),
+    Input("organism_choice", "value"),
     Input("gene_col_dd", "value"),
     Input("entrez_col_dd", "value"),
     Input("fc_col_dd", "value"),
@@ -2830,6 +2862,7 @@ def populate_mapping_dropdowns(meta):
 def validate_and_preview(
     meta,
     engine,
+    organism,
     gene_col,
     entrez_col,
     fc_col,
@@ -2882,6 +2915,7 @@ def validate_and_preview(
             abs_fc_thresh=float(abs_fc_thresh) if abs_fc_thresh not in (None, "") else None,
             use_pval_filter=use_pval_filter,
             use_abs_fc_filter=use_abs_fc_filter,
+            organism=organism or "human",
         )
 
         if not res["ok"]:
@@ -2983,6 +3017,7 @@ def clear_results(n):
     Output("poll_interval", "disabled"),
     Input("run_btn", "n_clicks"),
     State("engine_choice", "value"),
+    State("organism_choice", "value"),
     State("expr_path_store", "data"),
     State("network_choice", "value"),
     State("rels_path_store", "data"),
@@ -3004,6 +3039,7 @@ def clear_results(n):
 def start_run(
     n,
     engine,
+    organism,
     expr_path,
     network_choice,
     rels_uploaded,
@@ -3052,6 +3088,7 @@ def start_run(
         abs_fc_thresh=float(abs_fc_thresh) if abs_fc_thresh not in (None, "") else None,
         use_pval_filter=use_pval_filter,
         use_abs_fc_filter=use_abs_fc_filter,
+        organism=organism or "human",
     )
 
     if not norm_res["ok"]:
@@ -3062,6 +3099,7 @@ def start_run(
         target=job_thread,
         kwargs=dict(
             engine=engine,
+            organism=organism or "human",
             normalized_input_path=norm_res["engine_input_path"],
             network_choice=network_choice,
             rels_uploaded=rels_uploaded,
@@ -3436,7 +3474,7 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
                     int(row[nmm_col]) if pd.notna(row[nmm_col]) else None,
                 )
 
-    network_fig = build_regulatory_network_figure(
+    network_fig, network_height = build_regulatory_network_figure(
         edge_df=edge_display_df,
         tf_name_map=tf_name_map,
         target_name_map=target_name_map,
@@ -3568,7 +3606,7 @@ def _render_done(job_id, job, st, engine, current_tab, top_n_regulators, use_pva
                                     style={"color": THEME["muted"], "marginTop": "8px"},
                                 ),
                             ]),
-                            card("Interactive network graph", [dcc.Graph(figure=network_fig, config={"displaylogo": False})]),
+                            card("Interactive network graph", [dcc.Graph(figure=network_fig, config={"displaylogo": False}, responsive=True, style={"height": f"{network_height}px"})]),
                             card("Edge table", [
                                 html.Div(
                                     f"Showing {len(edge_display_df):,} edges after display filters.",
